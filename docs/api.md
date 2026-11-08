@@ -1,6 +1,8 @@
 # Daily Quest API 명세서
 
-> 버전: v0.1 (초안) · 작성일: 2026-11-05 · 담당: 백엔드(임정원)
+> 버전: v0.2 · 작성일: 2026-11-05 · 최종 수정: 2026-11-08 · 담당: 백엔드(임정원)
+>
+> 기획 원본은 Manyfast 프로젝트 "Daily Quest (DQ)"의 기능명세서입니다. 이 문서는 그 결정을 API 계약으로 옮긴 것이며, 기획에서 아직 **미결정**인 수치는 12장에 모아 두고 본문에는 권장 기본값을 적었습니다 (표시: †).
 >
 > 코드가 올라간 뒤에는 Swagger UI(`/swagger-ui.html`)가 기준이 되고, 이 문서는 설계 의도와 흐름 설명 위주로 유지합니다.
 
@@ -17,6 +19,7 @@
 9. [알림 (Notification)](#9-알림-notification)
 10. [도메인 모델 요약](#10-도메인-모델-요약)
 11. [MVP 우선순위](#11-mvp-우선순위)
+12. [미결정 사항](#12-미결정-사항)
 
 ---
 
@@ -35,7 +38,8 @@
 
 ### 1.2 인증 방식
 
-- 로그인 성공 시 **JWT Access Token**(유효 1시간)과 **Refresh Token**(유효 14일)을 발급합니다.
+- 로그인 성공 시 **JWT Access Token**(유효 30분)과 **Refresh Token**(유효 7일)을 발급합니다.
+- Access Token 만료 시 `TOKEN_EXPIRED`(401)를 받으면 2.3으로 재발급합니다. 토큰이 없거나 위조됐으면 `UNAUTHORIZED`(401).
 - 인증이 필요한 요청은 헤더에 토큰을 넣습니다.
 
 ```
@@ -164,7 +168,7 @@ Authorization: Bearer {accessToken}
 {
   "accessToken": "eyJhbGciOi...",
   "refreshToken": "eyJhbGciOi...",
-  "expiresIn": 3600,
+  "expiresIn": 1800,
   "user": { "userId": 1, "nickname": "정원", "avatarUrl": null, "coins": 0 }
 }
 ```
@@ -179,13 +183,13 @@ Authorization: Bearer {accessToken}
 { "refreshToken": "eyJhbGciOi..." }
 ```
 
-응답 `200`: 2.2와 동일한 토큰 구조 (Refresh Token도 새로 발급, 기존 것은 폐기)
+응답 `200`: 2.2와 동일한 토큰 구조 (Refresh Token도 새로 발급, 기존 것은 폐기 — 회전)
 
 에러: `INVALID_REFRESH_TOKEN` (401)
 
 ### 2.4 로그아웃 `POST /auth/logout` 🔒
 
-요청 본문 없음. 서버에 저장된 Refresh Token을 폐기합니다.
+요청 본문 없음. 서버에 저장된 이 사용자의 Refresh Token을 모두 폐기합니다 (모든 기기 로그아웃). Access Token은 만료 시각까지 유효합니다.
 
 응답 `204`
 
@@ -199,6 +203,8 @@ Authorization: Bearer {accessToken}
 | PATCH | `/users/me` | 내 정보 수정 (닉네임, 아바타 구성) | 🔒 |
 | GET | `/users/{userId}` | 다른 사용자 공개 프로필 | 🔒 |
 | PUT | `/users/me/fcm-token` | 푸시 알림 토큰 등록 | 🔒 |
+| PATCH | `/users/me/password` | 비밀번호 변경 | 🔒 |
+| DELETE | `/users/me` | 회원 탈퇴 | 🔒 |
 
 ### 3.1 내 정보 `GET /users/me` 🔒
 
@@ -243,11 +249,40 @@ Authorization: Bearer {accessToken}
 
 응답 `200`: `userId`, `nickname`, `avatar`, `stats` 만 반환 (이메일, 코인 제외)
 
+에러: `USER_NOT_FOUND` (404)
+
 ### 3.4 FCM 토큰 등록 `PUT /users/me/fcm-token` 🔒
 
 ```json
 { "token": "fcm-device-token..." }
 ```
+
+응답 `204`
+
+### 3.5 비밀번호 변경 `PATCH /users/me/password` 🔒
+
+```json
+{ "currentPassword": "P@ssw0rd!", "newPassword": "N3wP@ss!" }
+```
+
+| 필드 | 타입 | 필수 | 제약 |
+|---|---|---|---|
+| currentPassword | string | O | |
+| newPassword | string | O | 8~64자, 현재 비밀번호와 달라야 함 |
+
+응답 `204`. 변경 후 이 사용자의 Refresh Token을 모두 폐기합니다 (다른 기기 재로그인 유도).
+
+에러: `INVALID_CREDENTIALS` (401, 현재 비밀번호 불일치), `VALIDATION_ERROR` (400)
+
+### 3.6 회원 탈퇴 `DELETE /users/me` 🔒
+
+```json
+{ "password": "P@ssw0rd!" }
+```
+
+- 본인 확인을 위해 비밀번호를 받습니다. 불일치 시 `INVALID_CREDENTIALS` (401).
+- **방장인 룸이 하나라도 있으면 탈퇴할 수 없습니다** (`OWNER_MUST_TRANSFER`, 409). 4.13으로 위임하거나 4.6으로 삭제한 뒤 탈퇴합니다.
+- 탈퇴 시 계정 로그인 정보는 삭제하고, 인증·보상 등 활동 기록은 **익명화해 보존**합니다 (`users` 행은 남기되 `email`·`password_hash`·`fcm_token`을 비우고 `nickname`을 `탈퇴한 사용자`로 바꿈, `deleted_at` 기록). 룸 멤버십과 Refresh Token은 삭제합니다.
 
 응답 `204`
 
@@ -268,6 +303,8 @@ Authorization: Bearer {accessToken}
 | DELETE | `/rooms/{roomId}/leave` | 룸 나가기 | 🔒 |
 | GET | `/rooms/{roomId}/members` | 멤버 목록 (아바타 포함) | 🔒 |
 | POST | `/rooms/{roomId}/invite-code` | 초대코드 재발급 (방장) | 🔒 |
+| DELETE | `/rooms/{roomId}/members/{userId}` | 멤버 내보내기 (방장) | 🔒 |
+| POST | `/rooms/{roomId}/transfer-owner` | 방장 위임 (방장) | 🔒 |
 
 ### 4.1 공개 룸 목록 `GET /rooms` 🔒
 
@@ -327,10 +364,10 @@ Authorization: Bearer {accessToken}
 
 | 필드 | 타입 | 필수 | 제약 |
 |---|---|---|---|
-| name | string | O | 2~20자 |
-| description | string | | 최대 100자 |
+| name | string | O | 2~20자 † |
+| description | string | | 최대 100자 † |
 | isPublic | boolean | O | |
-| maxMembers | int | | 2~30, 기본 10 |
+| maxMembers | int | | 2~30, 기본 10 † |
 
 응답 `201`
 
@@ -372,7 +409,9 @@ Authorization: Bearer {accessToken}
 
 ### 4.5 룸 수정 `PATCH /rooms/{roomId}` 🔒 (방장)
 
-`name`, `description`, `isPublic`, `maxMembers` 중 보내는 것만 수정. 에러: `FORBIDDEN` (403)
+`name`, `description`, `isPublic`, `maxMembers` 중 보내는 것만 수정. 공개 → 비공개로 바꾸면 초대코드를 새로 발급하고, 비공개 → 공개로 바꾸면 초대코드를 제거합니다.
+
+에러: `FORBIDDEN` (403), `MAX_MEMBERS_BELOW_CURRENT` (409, `maxMembers`를 현재 멤버 수보다 작게 바꾸려는 경우 †)
 
 ### 4.6 룸 삭제 `DELETE /rooms/{roomId}` 🔒 (방장)
 
@@ -396,7 +435,7 @@ Authorization: Bearer {accessToken}
 
 ### 4.9 룸 나가기 `DELETE /rooms/{roomId}/leave` 🔒
 
-응답 `204`. 방장은 다른 멤버가 남아 있으면 나갈 수 없습니다 (`OWNER_CANNOT_LEAVE`, 409). 마지막 멤버가 나가면 룸이 삭제됩니다.
+응답 `204`. 방장은 다른 멤버가 남아 있으면 나갈 수 없습니다 (`OWNER_CANNOT_LEAVE`, 409). 4.13으로 위임한 뒤 나가거나 4.6으로 룸을 삭제합니다 †. 마지막 멤버(방장)가 나가면 룸이 삭제됩니다.
 
 ### 4.10 멤버 목록 `GET /rooms/{roomId}/members` 🔒
 
@@ -417,7 +456,27 @@ Authorization: Bearer {accessToken}
 
 ### 4.11 초대코드 재발급 `POST /rooms/{roomId}/invite-code` 🔒 (방장)
 
-응답 `200`: `{ "inviteCode": "Z3P8M1" }`
+응답 `200`: `{ "inviteCode": "Z3P8M1" }`. 기존 코드는 **즉시 무효**가 됩니다. 비공개 룸에서만 가능 (`ROOM_NOT_PRIVATE`, 409).
+
+### 4.12 멤버 내보내기 `DELETE /rooms/{roomId}/members/{userId}` 🔒 (방장)
+
+방장이 멤버를 룸에서 제외합니다. 자기 자신은 내보낼 수 없습니다 (4.9 또는 4.13 사용). 내보낸 멤버가 이미 받은 인증·보상 기록은 유지됩니다.
+
+응답 `204`
+
+에러: `FORBIDDEN` (403, 방장 아님), `NOT_A_MEMBER` (404, 대상이 멤버가 아님), `CANNOT_KICK_SELF` (409)
+
+### 4.13 방장 위임 `POST /rooms/{roomId}/transfer-owner` 🔒 (방장)
+
+```json
+{ "userId": 2 }
+```
+
+대상은 현재 룸 멤버여야 합니다. 성공 시 `rooms.owner_id`와 `room_members.role`을 함께 갱신하고, 기존 방장은 `MEMBER`로 남습니다.
+
+응답 `200`: 4.4 룸 상세
+
+에러: `FORBIDDEN` (403), `NOT_A_MEMBER` (409, 대상이 멤버가 아님), `ALREADY_OWNER` (409, 자기 자신에게 위임)
 
 ---
 
@@ -433,7 +492,7 @@ Authorization: Bearer {accessToken}
 **APP 미션 생성 규칙 (서버 핵심 로직)**
 
 - 매일 KST 00:00에 모든 룸에 대해 그날의 APP 미션을 1개 생성합니다.
-- 같은 룸에서 최근 14일 내에 나온 템플릿은 제외하고 랜덤 선정합니다.
+- 같은 룸에서 최근 14일 내에 나온 템플릿은 제외하고 랜덤 선정합니다 †. 제외하고 남는 템플릿이 없으면 활성 템플릿 전체에서 다시 선정합니다 †.
 - 스케줄러가 돌기 전에 조회 요청이 오면 그 시점에 생성합니다 (lazy 생성). 두 경로가 동시에 들어와도 `(room_id, date)` 유니크 제약으로 하루 1개만 보장합니다.
 
 | 메서드 | 경로 | 설명 | 인증 |
@@ -500,9 +559,9 @@ Authorization: Bearer {accessToken}
 
 | 필드 | 타입 | 필수 | 제약 |
 |---|---|---|---|
-| content | string | O | 2~100자 |
-| rewardCoins | int | O | 10~500, 10단위 |
-| dueAt | datetime | | 미래 시각, 기본 생성 후 7일 |
+| content | string | O | 2~100자 † |
+| rewardCoins | int | O | 10~500, 10단위 † |
+| dueAt | datetime | | 미래 시각, 기본 생성 후 7일 † |
 
 응답 `201`: 5.1의 단일 미션 객체
 
@@ -523,7 +582,7 @@ Authorization: Bearer {accessToken}
 ### 5.5 ~ 5.6 수정 / 삭제
 
 - `PATCH /missions/{missionId}`: `content`, `dueAt` 수정. 이미 인증이 1개 이상 제출됐으면 수정 불가 (`MISSION_HAS_PROOFS`, 409). APP 미션은 수정 불가.
-- `DELETE /missions/{missionId}`: 작성자 또는 방장. 응답 `204`.
+- `DELETE /missions/{missionId}`: 작성자 또는 방장. 이미 인증이 1개 이상 제출됐으면 삭제 불가 (`MISSION_HAS_PROOFS`, 409) †. APP 미션은 삭제 불가. 응답 `204`.
 
 ### 5.7 내 미션 모아보기 `GET /missions/mine` 🔒
 
@@ -547,10 +606,11 @@ Authorization: Bearer {accessToken}
 **승인 규칙 (서버 핵심 로직)**
 
 - 제출자 본인을 제외한 룸 멤버가 승인/거절 투표를 합니다.
-- **승인 수가 `ceil((멤버 수 - 1) / 2)` 이상**이면 `APPROVED`로 확정하고 즉시 보상을 지급합니다. 멤버가 혼자인 룸은 제출 즉시 자동 승인됩니다.
+- **승인 수가 `ceil((멤버 수 - 1) / 2)` 이상**이면 `APPROVED`로 확정하고 즉시 보상을 지급합니다 †. 멤버가 혼자인 룸은 제출 즉시 자동 승인됩니다 †.
 - 거절 수가 같은 기준에 도달하면 `REJECTED`로 확정합니다. 거절된 미션은 다시 제출할 수 있습니다.
-- 확정 전까지는 `PENDING`이며, 미션 마감 후 24시간이 지나도 미확정이면 `EXPIRED`로 처리합니다.
-- 보상 지급은 인증 확정과 **같은 트랜잭션**에서 처리하며, 한 인증당 1회만 지급됩니다.
+- 확정 전까지는 `PENDING`이며, 미션 마감 후 24시간이 지나도 미확정이면 `EXPIRED`로 처리합니다 †.
+- 보상 지급은 인증 확정과 **같은 트랜잭션**에서 처리하며, 한 인증당 1회만 지급됩니다. 동시 투표로 두 요청이 같은 시점에 확정 조건을 만족해도 행 잠금(`SELECT … FOR UPDATE`)으로 한 번만 확정·지급합니다.
+- 핵심 범위(MVP)는 사진·텍스트 인증입니다. 영상 인증과 이모지 리액션은 후순위이며 같은 엔드포인트를 씁니다.
 
 | 메서드 | 경로 | 설명 | 인증 |
 |---|---|---|---|
@@ -571,7 +631,7 @@ Authorization: Bearer {accessToken}
 
 | 필드 | 설명 |
 |---|---|
-| file | 이미지(jpg, png, webp, 최대 10MB) 또는 영상(mp4, 최대 50MB, 30초) |
+| file | 이미지(jpg, png, webp, 최대 10MB †) 또는 영상(mp4, 최대 50MB, 30초 — 후순위) |
 | purpose | `PROOF` \| `ROOM_THUMBNAIL` |
 
 응답 `201`
@@ -605,8 +665,8 @@ Authorization: Bearer {accessToken}
 |---|---|---|---|
 | mediaUrl | string | △ | `mediaUrl` 또는 `text` 중 하나는 필수 |
 | thumbnailUrl | string | | |
-| mediaType | `IMAGE` \| `VIDEO` \| `TEXT` | O | |
-| text | string | △ | 최대 300자 |
+| mediaType | `IMAGE` \| `TEXT` \| `VIDEO`(후순위) | O | |
+| text | string | △ | 최대 300자 † |
 
 응답 `201`
 
@@ -649,7 +709,7 @@ Authorization: Bearer {accessToken}
 
 ### 6.4 승인 / 거절 `POST /proofs/{proofId}/approve` · `/reject` 🔒
 
-요청 본문 없음. 본인 인증에는 투표할 수 없습니다. 이미 투표한 경우 투표를 변경합니다.
+요청 본문 없음. 본인 인증에는 투표할 수 없습니다. 확정 전에는 이미 투표한 경우 투표를 변경합니다 †.
 
 응답 `200`
 
@@ -672,7 +732,7 @@ Authorization: Bearer {accessToken}
 { "emoji": "❤️" }
 ```
 
-허용 이모지: `❤️ 🔥 👏 😂 😮` (서버 화이트리스트). 한 사용자가 한 인증에 같은 이모지는 1번만. 응답 `200`: 리액션 목록. 취소는 `DELETE` + 같은 본문.
+허용 이모지: `❤️ 🔥 👏 😂 😮` (서버 화이트리스트 †). 한 사용자가 한 인증에 같은 이모지는 1번만. 응답 `200`: 리액션 목록. 취소는 `DELETE` + 같은 본문.
 
 ### 6.6 룸 피드 `GET /rooms/{roomId}/feed` 🔒
 
@@ -700,7 +760,15 @@ Authorization: Bearer {accessToken}
 
 ### 6.7 승인 대기 목록 `GET /rooms/{roomId}/proofs/pending` 🔒
 
-내가 아직 투표하지 않은 `PENDING` 인증 목록. 응답 형식은 6.6과 동일.
+내가 아직 투표하지 않은 `PENDING` 인증 목록. 본인이 제출한 인증은 제외합니다 †. 응답 형식은 6.6과 동일.
+
+### 6.8 인증 삭제 `DELETE /proofs/{proofId}` 🔒
+
+제출자 본인이 `PENDING` 상태의 인증만 삭제할 수 있습니다. 연결된 투표(`proof_votes`)와 리액션도 함께 삭제됩니다.
+
+응답 `204`
+
+에러: `FORBIDDEN` (403, 타인의 인증), `PROOF_ALREADY_FINALIZED` (409, 이미 확정된 인증) †
 
 ---
 
@@ -858,7 +926,7 @@ users ──< room_members >── rooms ──< missions ──< proofs ──<
 
 | 테이블 | 주요 컬럼 | 비고 |
 |---|---|---|
-| users | id, email(uq), password_hash, nickname(uq), coins, avatar_json, fcm_token, created_at | |
+| users | id, email(uq), password_hash, nickname(uq), coins, avatar_hair/top/bottom/accessory, fcm_token, deleted_at, created_at | 탈퇴 시 익명화 보존 |
 | refresh_tokens | id, user_id, token_hash, expires_at | 로그아웃 시 삭제 |
 | rooms | id, name, description, is_public, invite_code(uq), owner_id, max_members, thumbnail_url, created_at | |
 | room_members | room_id, user_id, role(OWNER/MEMBER), joined_at | PK (room_id, user_id) |
@@ -892,9 +960,40 @@ users ──< room_members >── rooms ──< missions ──< proofs ──<
 
 ---
 
+## 12. 미결정 사항
+
+본문의 † 표시는 기획(Manyfast)에서 아직 질문 상태인 값입니다. 구현은 아래 **기본안**으로 진행하며, 기획이 다른 안을 고르면 값만 바꿉니다.
+
+| # | 항목 | 기본안 (구현값) | 대안 | 관련 |
+|---|---|---|---|---|
+| 1 | 닉네임 길이 | 2~12자 | 2~20자 | 2.1, 3.2 |
+| 2 | 룸 이름·설명 길이 | 2~20자 · 100자 | 2~30자 · 200자 | 4.3 |
+| 3 | 룸 최대 인원 | 2~30명, 기본 10 | 2~50명, 기본 20 | 4.3 |
+| 4 | `isHot` 기준 | 인기 점수 상위 3개 | 상위 10% / 10점 이상 | 4.1 |
+| 5 | maxMembers를 현재 인원보다 작게 수정 | 거부(409) | 기존 멤버 유지, 신규만 차단 | 4.5 |
+| 6 | 방장 나가기 | 위임 후 허용 | 삭제 후 허용 / 계속 차단 | 4.9 |
+| 7 | 룸 삭제 시 지급된 보상 | 보상 이력은 보존, 룸 데이터만 삭제 | 연쇄 삭제 | 4.6 |
+| 8 | APP 미션 템플릿 중복 제외 | 최근 14일 | 7일 / 제외 안 함 | 5 |
+| 9 | 제외 후 남는 템플릿 없음 | 전체에서 재선정 | 그날 미션 없음 | 5 |
+| 10 | 멤버 미션 코인 범위 | 10~500, 10단위 | 10~100 | 5.3 |
+| 11 | 멤버 미션 내용 길이·기본 마감 | 2~100자 · 7일 | 2~200자 · 1일 | 5.3 |
+| 12 | 인증 있는 멤버 미션 삭제 | 금지(409) | 기록과 함께 삭제 | 5.6 |
+| 13 | 목록 페이지 크기 | 기본 20, 최대 100 | 최대 50 | 1.6 |
+| 14 | 사진 용량·인증 문구 길이 | 10MB · 300자 | 5MB · 500자 | 6.1, 6.2 |
+| 15 | 승인 확정 표 수 | `ceil((멤버 수 - 1) / 2)` | 제출자 외 멤버 과반 | 6 |
+| 16 | 1인 룸 인증 | 제출 즉시 자동 승인 | 승인 보류 | 6 |
+| 17 | 미확정 인증 만료 | 마감 후 24시간 | 마감 즉시 | 6 |
+| 18 | 확정 전 투표 변경 | 허용 | 금지 | 6.4 |
+| 19 | 승인 대기 목록에 본인 인증 | 제외 | 포함(투표만 차단) | 6.7 |
+| 20 | 인증 삭제 불가 에러 | 타인 403 / 확정 409 구분 | 403 단일 | 6.8 |
+| 21 | 리액션 이모지 | 5종 화이트리스트 | 제한 없음 | 6.5 |
+
+---
+
 ## 변경 이력
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
 | v0.1 | 2026-11-05 | 초안 작성 |
 | v0.1.1 | 2026-11-08 | 공개 룸 목록 기본 정렬을 인기 점수로 변경, 점수 계산 규칙 추가 (4.1) |
+| v0.2 | 2026-11-08 | Manyfast 기능명세와 동기화: 토큰 유효기간 30분/7일, 비밀번호 변경·회원 탈퇴(3.5~3.6), 멤버 내보내기·방장 위임(4.12~4.13), 초대코드 재발급 무효화, 룸 수정 인원 제한, 인증 삭제 상세(6.8), 영상·리액션 후순위 표기, 미결정 사항 12장 신설 |
