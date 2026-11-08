@@ -271,7 +271,7 @@ Authorization: Bearer {accessToken}
 
 ### 4.1 공개 룸 목록 `GET /rooms` 🔒
 
-쿼리: 페이지네이션 + `keyword`(이름 검색, 선택), `sort` 기본 `memberCount,desc`
+쿼리: 페이지네이션 + `keyword`(이름 검색, 선택), `sort` 기본 `popularity,desc` (그 외 `memberCount,desc`, `createdAt,desc` 허용)
 
 응답 `200`
 
@@ -294,7 +294,14 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-`isHot`: 최근 7일 인증 제출 수 상위 룸(서버 계산). `joined`: 요청자가 이미 멤버인지.
+`joined`: 요청자가 이미 멤버인지.
+
+**인기 점수 정렬 규칙 (서버 계산)**
+
+- 인기 점수 = (최근 7일 인증 제출 수 × 2) + 멤버 수. 목록 조회 시 서버가 계산해 정렬합니다.
+- 기본 정렬은 인기 점수 내림차순, 동점이면 생성일 최신순입니다.
+- `isHot`: 인기 점수 상위 룸에 표시합니다. 기준(상위 3개 / 상위 10% / 10점 이상)은 미결정이며 기본안은 상위 3개입니다.
+- 방 카테고리나 사용자 조회 기록 기반 추천은 MVP 범위 밖이며 후순위입니다.
 
 ### 4.2 내 룸 목록 `GET /rooms/mine` 🔒
 
@@ -890,3 +897,4 @@ users ──< room_members >── rooms ──< missions ──< proofs ──<
 | 버전 | 날짜 | 내용 |
 |---|---|---|
 | v0.1 | 2026-11-05 | 초안 작성 |
+| v0.1.1 | 2026-11-08 | 공개 룸 목록 기본 정렬을 인기 점수로 변경, 점수 계산 규칙 추가 (4.1) |
