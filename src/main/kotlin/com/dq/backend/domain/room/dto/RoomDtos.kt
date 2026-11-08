@@ -88,10 +88,12 @@ data class RoomDetailResponse(
     val memberCount: Long,
     val maxMembers: Int,
     val myRole: RoomRole?,
-    // TODO(feat/mission): 오늘의 APP 미션 요약 { missionId, content }
-    val todayMission: Any? = null,
+    /** 오늘의 APP 미션 요약. 멤버에게만 채워진다. */
+    val todayMission: TodayMissionBrief?,
     val createdAt: Instant,
 )
+
+data class TodayMissionBrief(val missionId: Long, val content: String)
 
 /** GET /rooms/{roomId}/members (api.md 4.10) */
 data class RoomMemberResponse(

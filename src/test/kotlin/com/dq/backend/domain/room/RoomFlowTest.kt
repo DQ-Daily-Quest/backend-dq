@@ -32,7 +32,7 @@ class RoomFlowTest {
         val email = "$prefix$n@room.test"
         mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","password":"P@ssw0rd!","nickname":"$prefix$n"}"""
+            content = """{"email":"$email","password":"P@ssw0rd!","nickname":"r$prefix$n"}"""
         }.andExpect { status { isCreated() } }
         val body = mockMvc.post("/api/v1/auth/login") {
             contentType = MediaType.APPLICATION_JSON
