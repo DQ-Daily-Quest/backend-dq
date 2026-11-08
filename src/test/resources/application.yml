@@ -4,10 +4,13 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+  # 테스트는 H2 인메모리 + Hibernate 자동 생성 (Flyway SQL은 PostgreSQL 전용)
   jpa:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  flyway:
+    enabled: false
 
 dq:
   jwt:
