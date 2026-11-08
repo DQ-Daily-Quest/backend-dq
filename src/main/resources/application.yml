@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: backend-dq
+  profiles:
+    default: local
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/dq}
+    username: ${DB_USERNAME:dq}
+    password: ${DB_PASSWORD:dq}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+  jackson:
+    time-zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+server:
+  port: ${SERVER_PORT:8080}
+
+dq:
+  jwt:
+    secret: ${JWT_SECRET:dq-local-dev-secret-key-change-me-at-least-32-bytes}
+    access-token-expiry-seconds: 3600       # 1시간
+    refresh-token-expiry-seconds: 1209600   # 14일
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+    base-url: ${UPLOAD_BASE_URL:http://localhost:8080/files}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    com.dq.backend: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
