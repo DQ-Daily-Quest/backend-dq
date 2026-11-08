@@ -7,6 +7,8 @@ import com.dq.backend.domain.room.dto.RoomDetailResponse
 import com.dq.backend.domain.room.dto.RoomMemberResponse
 import com.dq.backend.domain.room.dto.RoomSummaryResponse
 import com.dq.backend.domain.room.dto.UpdateRoomRequest
+import com.dq.backend.domain.mission.service.AppMissionService
+import com.dq.backend.domain.room.dto.TodayMissionBrief
 import com.dq.backend.domain.room.dto.UserBrief
 import com.dq.backend.domain.room.entity.Room
 import com.dq.backend.domain.room.entity.RoomMember
@@ -33,6 +35,7 @@ class RoomService(
     private val roomMemberRepository: RoomMemberRepository,
     private val userRepository: UserRepository,
     private val inviteCodeGenerator: InviteCodeGenerator,
+    private val appMissionService: AppMissionService,
 ) {
     companion object {
         /** isHot: 인기 점수 상위 N개 (api.md 12장 #4 기본안) */
@@ -248,6 +251,7 @@ class RoomService(
             memberCount = roomMemberRepository.countByIdRoomId(room.id),
             maxMembers = room.maxMembers,
             myRole = myRole,
+            todayMission = if (myRole != null) appMissionService.getOrCreateTodayOrNull(room.id)?.let { TodayMissionBrief(it.id, it.content) } else null,
             createdAt = room.createdAt,
         )
     }

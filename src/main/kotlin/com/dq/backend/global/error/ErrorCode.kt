@@ -38,4 +38,10 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     NOT_A_MEMBER(HttpStatus.NOT_FOUND, "룸 멤버가 아닙니다."),
     CANNOT_KICK_SELF(HttpStatus.CONFLICT, "자기 자신은 내보낼 수 없습니다."),
     ALREADY_OWNER(HttpStatus.CONFLICT, "이미 방장입니다."),
+
+    // 미션 (api.md 5장)
+    MISSION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 미션입니다."),
+    MISSION_HAS_PROOFS(HttpStatus.CONFLICT, "이미 인증이 제출된 미션은 수정·삭제할 수 없습니다."),
+    APP_MISSION_IMMUTABLE(HttpStatus.CONFLICT, "APP 미션은 수정·삭제할 수 없습니다."),
+    NO_ACTIVE_TEMPLATE(HttpStatus.INTERNAL_SERVER_ERROR, "활성 미션 템플릿이 없습니다."),
 }
