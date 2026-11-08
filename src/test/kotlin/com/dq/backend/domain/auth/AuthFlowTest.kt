@@ -53,7 +53,7 @@ class AuthFlowTest {
                 status { isOk() }
                 jsonPath("$.accessToken") { exists() }
                 jsonPath("$.refreshToken") { exists() }
-                jsonPath("$.expiresIn") { value(3600) }
+                jsonPath("$.expiresIn") { value(1800) }
                 jsonPath("$.user.nickname") { value("정원a1") }
                 jsonPath("$.user.coins") { value(0) }
             }
@@ -164,6 +164,31 @@ class AuthFlowTest {
         val (access, refresh) = tokens("lo@test.com", "lonick")
         mockMvc.post("/api/v1/auth/logout") { header("Authorization", "Bearer $access") }
             .andExpect { status { isNoContent() } }
+        mockMvc.post("/api/v1/auth/refresh") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"refreshToken":"$refresh"}"""
+        }.andExpect { status { isUnauthorized() } }
+    }
+
+    @Test
+    fun `비밀번호를 변경하면 새 비밀번호로만 로그인되고 Refresh Token은 폐기된다`() {
+        val (access, refresh) = tokens("cp@test.com", "cpnick")
+        mockMvc.patch("/api/v1/users/me/password") {
+            header("Authorization", "Bearer $access")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"currentPassword":"wrong","newPassword":"N3wP@ss!!"}"""
+        }.andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("INVALID_CREDENTIALS") }
+        }
+        mockMvc.patch("/api/v1/users/me/password") {
+            header("Authorization", "Bearer $access")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"currentPassword":"P@ssw0rd!","newPassword":"N3wP@ss!!"}"""
+        }.andExpect { status { isNoContent() } }
+
+        login("cp@test.com", "P@ssw0rd!").andExpect { status { isUnauthorized() } }
+        login("cp@test.com", "N3wP@ss!!").andExpect { status { isOk() } }
         mockMvc.post("/api/v1/auth/refresh") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"refreshToken":"$refresh"}"""

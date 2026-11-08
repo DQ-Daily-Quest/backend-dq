@@ -76,3 +76,10 @@ data class FcmTokenRequest(
     @field:Size(max = 512)
     val token: String,
 )
+
+/** PATCH /users/me/password (api.md 3.5) */
+data class ChangePasswordRequest(
+    @field:NotBlank val currentPassword: String,
+    @field:NotBlank @field:Size(min = 8, max = 64, message = "비밀번호는 8~64자여야 합니다.")
+    val newPassword: String,
+)

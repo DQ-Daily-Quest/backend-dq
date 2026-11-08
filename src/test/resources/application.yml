@@ -12,8 +12,8 @@ spring:
 dq:
   jwt:
     secret: test-secret-key-for-unit-tests-at-least-32-bytes-long
-    access-token-expiry-seconds: 3600
-    refresh-token-expiry-seconds: 1209600
+    access-token-expiry-seconds: 1800
+    refresh-token-expiry-seconds: 604800
   upload:
     dir: ./build/test-uploads
     base-url: http://localhost:8080/files

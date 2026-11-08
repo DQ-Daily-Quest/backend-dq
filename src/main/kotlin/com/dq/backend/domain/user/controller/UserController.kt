@@ -1,5 +1,6 @@
 package com.dq.backend.domain.user.controller
 
+import com.dq.backend.domain.user.dto.ChangePasswordRequest
 import com.dq.backend.domain.user.dto.FcmTokenRequest
 import com.dq.backend.domain.user.dto.UpdateMeRequest
 import com.dq.backend.domain.user.dto.UserMeResponse
@@ -36,6 +37,12 @@ class UserController(private val userService: UserService) {
     @Operation(summary = "다른 사용자 공개 프로필")
     @GetMapping("/{userId}")
     fun publicProfile(@PathVariable userId: Long): UserPublicResponse = userService.getPublicProfile(userId)
+
+    @Operation(summary = "비밀번호 변경 (성공 시 모든 Refresh Token 폐기)")
+    @PatchMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun changePassword(@CurrentUser userId: Long, @Valid @RequestBody request: ChangePasswordRequest) =
+        userService.changePassword(userId, request)
 
     @Operation(summary = "푸시 알림 토큰 등록")
     @PutMapping("/me/fcm-token")
