@@ -1,6 +1,7 @@
 package com.dq.backend.domain.user.service
 
 import com.dq.backend.domain.auth.service.RefreshTokenService
+import com.dq.backend.domain.room.repository.RoomMemberRepository
 import com.dq.backend.domain.user.dto.ChangePasswordRequest
 import com.dq.backend.domain.user.dto.FcmTokenRequest
 import com.dq.backend.domain.user.dto.UpdateMeRequest
@@ -23,6 +24,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val refreshTokenService: RefreshTokenService,
+    private val roomMemberRepository: RoomMemberRepository,
 ) {
 
     fun getUser(userId: Long): User =
@@ -78,6 +80,6 @@ class UserService(
         getUser(userId).fcmToken = request.token
     }
 
-    // TODO(feat/room, feat/proof): room_members / proofs(APPROVED) 집계로 교체
-    private fun statsOf(user: User) = UserStats()
+    // TODO(feat/proof): completedMissionCount 는 proofs(APPROVED) 집계로 교체
+    private fun statsOf(user: User) = UserStats(roomCount = roomMemberRepository.countByIdUserId(user.id))
 }
