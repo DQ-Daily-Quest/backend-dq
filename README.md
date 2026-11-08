@@ -12,7 +12,7 @@ Daily Quest 앱의 백엔드 서버입니다. (Team JJJ · 담당: 임정원)
 # 1. 로컬 PostgreSQL (Docker, 포트 5433)
 docker compose up -d
 
-# 2. 서버 실행 (기본 프로필 local, ddl-auto=update)
+# 2. 서버 실행 (기본 프로필 local) — 기동 시 Flyway가 db/migration 의 SQL을 순서대로 적용
 ./gradlew bootRun
 
 # 3. 확인
@@ -20,6 +20,13 @@ curl http://localhost:8080/api/v1/health
 ```
 
 테스트: `./gradlew test` (H2 인메모리 DB 사용, Postgres 불필요)
+
+## DB 스키마 관리 (Flyway)
+
+- 스키마는 `src/main/resources/db/migration/V{n}__{설명}.sql` 로 관리합니다. Hibernate는 `ddl-auto=validate` 로 엔티티와 DB가 맞는지 검증만 합니다.
+- 새 테이블/컬럼이 필요하면 **기존 파일을 고치지 말고** 다음 번호의 새 파일을 추가합니다. (예: `V2__rooms.sql`)
+- 이전에 `ddl-auto=update` 로 만든 로컬 DB가 있으면 한 번 초기화합니다: `docker compose down -v && docker compose up -d`
+- 테스트(H2)는 Flyway 를 끄고 Hibernate 자동 생성을 씁니다. (Flyway SQL 은 PostgreSQL 전용)
 
 DB 접속 정보는 `application.yml`의 환경변수로 바꿀 수 있습니다: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `UPLOAD_DIR`.
 
