@@ -476,7 +476,7 @@ Authorization: Bearer {accessToken}
 
 응답 `200`: 4.4 룸 상세
 
-에러: `FORBIDDEN` (403), `NOT_A_MEMBER` (409, 대상이 멤버가 아님), `ALREADY_OWNER` (409, 자기 자신에게 위임)
+에러: `FORBIDDEN` (403), `NOT_A_MEMBER` (404, 대상이 멤버가 아님), `ALREADY_OWNER` (409, 자기 자신에게 위임)
 
 ---
 
