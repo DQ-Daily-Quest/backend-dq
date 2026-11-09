@@ -8,6 +8,7 @@ import com.dq.backend.domain.room.dto.RoomMemberResponse
 import com.dq.backend.domain.room.dto.RoomSummaryResponse
 import com.dq.backend.domain.room.dto.UpdateRoomRequest
 import com.dq.backend.domain.mission.service.AppMissionService
+import com.dq.backend.domain.proof.repository.ProofRepository
 import com.dq.backend.domain.room.dto.TodayMissionBrief
 import com.dq.backend.domain.room.dto.UserBrief
 import com.dq.backend.domain.room.entity.Room
@@ -27,6 +28,8 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
+import java.time.Instant
 
 @Service
 @Transactional(readOnly = true)
@@ -36,12 +39,16 @@ class RoomService(
     private val userRepository: UserRepository,
     private val inviteCodeGenerator: InviteCodeGenerator,
     private val appMissionService: AppMissionService,
+    private val proofRepository: ProofRepository,
 ) {
     companion object {
         /** isHot: 인기 점수 상위 N개 (api.md 12장 #4 기본안) */
         const val HOT_ROOM_COUNT = 3
         const val MAX_PAGE_SIZE = 100
+        val POPULARITY_WINDOW: Duration = Duration.ofDays(7)
     }
+
+    private fun popularitySince() = Instant.now().minus(POPULARITY_WINDOW)
 
     // ---------- 조회 ----------
 
@@ -51,9 +58,9 @@ class RoomService(
         val kw = keyword?.trim().orEmpty()
         val result = when (sort?.substringBefore(',')) {
             "createdAt" -> roomRepository.findPublicByCreatedAt(kw, pageable)
-            else -> roomRepository.findPublicByPopularity(kw, pageable) // popularity == memberCount (proof 구현 전)
+            else -> roomRepository.findPublicByPopularity(kw, popularitySince(), pageable)
         }
-        val hotIds = roomRepository.findPublicByPopularity("", PageRequest.of(0, HOT_ROOM_COUNT))
+        val hotIds = roomRepository.findPublicByPopularity("", popularitySince(), PageRequest.of(0, HOT_ROOM_COUNT))
             .content.map { it.room.id }.toSet()
         val joinedIds = roomMemberRepository.findJoinedRoomIds(userId, result.content.map { it.room.id })
         return PageResponse.from(result) { toSummary(it, isHot = it.room.id in hotIds, joined = it.room.id in joinedIds) }
@@ -61,11 +68,13 @@ class RoomService(
 
     /** 4.2 내 룸 목록 */
     fun listMine(userId: Long): List<RoomSummaryResponse> {
-        val hotIds = roomRepository.findPublicByPopularity("", PageRequest.of(0, HOT_ROOM_COUNT))
+        val hotIds = roomRepository.findPublicByPopularity("", popularitySince(), PageRequest.of(0, HOT_ROOM_COUNT))
             .content.map { it.room.id }.toSet()
         return roomRepository.findMine(userId).map {
-            toSummary(it, isHot = it.room.id in hotIds, joined = true)
-                .copy(todayMissionDone = false, pendingProofCount = 0) // TODO(feat/mission, feat/proof)
+            toSummary(it, isHot = it.room.id in hotIds, joined = true).copy(
+                todayMissionDone = userId in todayDoneUserIds(it.room.id),
+                pendingProofCount = proofRepository.countPendingForVoter(it.room.id, userId),
+            )
         }
     }
 
@@ -83,7 +92,8 @@ class RoomService(
         requireMember(roomId, userId)
         val members = roomMemberRepository.findAllByIdRoomIdOrderByJoinedAtAsc(roomId)
         val users = userRepository.findAllById(members.map { it.userId }).associateBy { it.id }
-        return members.mapNotNull { m -> users[m.userId]?.let { RoomMemberResponse.from(m, it) } }
+        val done = todayDoneUserIds(roomId)
+        return members.mapNotNull { m -> users[m.userId]?.let { RoomMemberResponse.from(m, it, todayMissionDone = m.userId in done) } }
     }
 
     // ---------- 생성 / 수정 / 삭제 ----------
@@ -208,6 +218,10 @@ class RoomService(
     fun ownsAnyRoom(userId: Long) = roomRepository.existsByOwnerId(userId)
 
     // ---------- 내부 ----------
+
+    /** 오늘의 APP 미션에 인증(대기/승인)을 올린 멤버 ID */
+    private fun todayDoneUserIds(roomId: Long): Set<Long> =
+        appMissionService.getOrCreateTodayOrNull(roomId)?.let { proofRepository.findUserIdsWithOpenProof(it.id) } ?: emptySet()
 
     private fun getRoom(roomId: Long): Room =
         roomRepository.findByIdOrNull(roomId) ?: throw NotFoundException(ErrorCode.ROOM_NOT_FOUND)

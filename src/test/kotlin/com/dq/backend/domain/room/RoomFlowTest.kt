@@ -146,9 +146,14 @@ class RoomFlowTest {
         val content = objectMapper.readTree(body).get("content")
         assertEquals("Alpha Crew", content[0].get("name").asString())
         assertEquals(3, content[0].get("memberCount").asInt())
-        assertEquals(true, content[0].get("isHot").asBoolean())
         assertEquals(false, content[0].get("joined").asBoolean())
         content.forEach { assertEquals(true, it.get("isPublic").asBoolean()) }
+
+        // isHot 은 전체 공개 룸 중 인기 점수 상위 3개에만 붙는다 (다른 테스트가 만든 룸 포함)
+        val all = objectMapper.readTree(
+            mockMvc.get("/api/v1/rooms") { header("Authorization", "Bearer $viewer"); param("size", "100") }.andReturn().response.contentAsString,
+        ).get("content")
+        all.forEachIndexed { i, r -> assertEquals(i < 3, r.get("isHot").asBoolean(), "index $i ${r.get("name")}") }
 
         mockMvc.get("/api/v1/rooms/mine") { header("Authorization", "Bearer $owner") }
             .andExpect { status { isOk() }; jsonPath("$.length()") { value(3) }; jsonPath("$[0].joined") { value(true) } }
