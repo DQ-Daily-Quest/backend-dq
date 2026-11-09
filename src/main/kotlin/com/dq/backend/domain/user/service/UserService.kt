@@ -1,6 +1,8 @@
 package com.dq.backend.domain.user.service
 
 import com.dq.backend.domain.auth.service.RefreshTokenService
+import com.dq.backend.domain.proof.entity.ProofStatus
+import com.dq.backend.domain.proof.repository.ProofRepository
 import com.dq.backend.domain.room.repository.RoomMemberRepository
 import com.dq.backend.domain.user.dto.ChangePasswordRequest
 import com.dq.backend.domain.user.dto.FcmTokenRequest
@@ -25,6 +27,7 @@ class UserService(
     private val passwordEncoder: PasswordEncoder,
     private val refreshTokenService: RefreshTokenService,
     private val roomMemberRepository: RoomMemberRepository,
+    private val proofRepository: ProofRepository,
 ) {
 
     fun getUser(userId: Long): User =
@@ -80,6 +83,8 @@ class UserService(
         getUser(userId).fcmToken = request.token
     }
 
-    // TODO(feat/proof): completedMissionCount 는 proofs(APPROVED) 집계로 교체
-    private fun statsOf(user: User) = UserStats(roomCount = roomMemberRepository.countByIdUserId(user.id))
+    private fun statsOf(user: User) = UserStats(
+        roomCount = roomMemberRepository.countByIdUserId(user.id),
+        completedMissionCount = proofRepository.countByUserIdAndStatus(user.id, ProofStatus.APPROVED),
+    )
 }

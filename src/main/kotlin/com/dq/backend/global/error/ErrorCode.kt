@@ -44,4 +44,15 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     MISSION_HAS_PROOFS(HttpStatus.CONFLICT, "이미 인증이 제출된 미션은 수정·삭제할 수 없습니다."),
     APP_MISSION_IMMUTABLE(HttpStatus.CONFLICT, "APP 미션은 수정·삭제할 수 없습니다."),
     NO_ACTIVE_TEMPLATE(HttpStatus.INTERNAL_SERVER_ERROR, "활성 미션 템플릿이 없습니다."),
+
+    // 인증 제출 (api.md 6장)
+    PROOF_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 인증입니다."),
+    MISSION_EXPIRED(HttpStatus.CONFLICT, "마감된 미션입니다."),
+    PROOF_ALREADY_SUBMITTED(HttpStatus.CONFLICT, "이 미션에 이미 제출한 인증이 있습니다."),
+    CANNOT_VOTE_OWN_PROOF(HttpStatus.FORBIDDEN, "본인 인증에는 투표할 수 없습니다."),
+    PROOF_ALREADY_FINALIZED(HttpStatus.CONFLICT, "이미 확정된 인증입니다."),
+    INVALID_EMOJI(HttpStatus.BAD_REQUEST, "허용되지 않는 이모지입니다."),
+    FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "파일 용량이 너무 큽니다."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
+    FILE_EMPTY(HttpStatus.BAD_REQUEST, "파일이 비어 있습니다."),
 }

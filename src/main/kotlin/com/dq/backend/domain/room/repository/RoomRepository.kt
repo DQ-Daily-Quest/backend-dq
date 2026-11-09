@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
+import java.time.Instant
 
 /** 목록 조회용 프로젝션: 룸 + 멤버 수 */
 interface RoomWithCount {
@@ -27,23 +28,24 @@ interface RoomRepository : JpaRepository<Room, Long> {
 
     /**
      * 공개 룸 목록, 인기 점수 내림차순 (api.md 4.1).
-     * 인기 점수 = (최근 7일 인증 제출 수 × 2) + 멤버 수.
-     * TODO(feat/proof): proofs 테이블이 생기면 최근 7일 인증 수 항을 추가한다. 지금은 멤버 수만 반영.
+     * 인기 점수 = (최근 7일 인증 제출 수 × 2) + 멤버 수. since = now - 7일.
      */
     @Query(
         value = """
-            select r as room, count(m) as memberCount
+            select r as room, count(m) as memberCount,
+                   (count(m) + 2 * (select count(p) from Proof p join Mission mm on p.missionId = mm.id
+                                    where mm.roomId = r.id and p.createdAt >= :since)) as score
             from Room r left join RoomMember m on m.id.roomId = r.id
             where r.isPublic = true and lower(r.name) like lower(concat('%', :keyword, '%'))
             group by r
-            order by count(m) desc, r.createdAt desc
+            order by score desc, r.createdAt desc
         """,
         countQuery = """
             select count(r) from Room r
             where r.isPublic = true and lower(r.name) like lower(concat('%', :keyword, '%'))
         """,
     )
-    fun findPublicByPopularity(keyword: String, pageable: Pageable): Page<RoomWithCount>
+    fun findPublicByPopularity(keyword: String, since: Instant, pageable: Pageable): Page<RoomWithCount>
 
     @Query(
         value = """

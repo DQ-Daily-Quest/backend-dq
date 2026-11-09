@@ -37,7 +37,7 @@ data class RewardResponse(
     val amount: Int? = null,
 )
 
-/** 요청자가 제출한 인증 요약. TODO(feat/proof): 실제 값 */
+/** 요청자가 제출한 인증 요약 (PENDING/APPROVED) */
 data class MyProofSummary(val proofId: Long, val status: String)
 
 /** 5.1 미션 객체 */
@@ -72,7 +72,7 @@ data class MissionResponse(
     }
 }
 
-/** 5.4 미션 상세의 인증 항목. TODO(feat/proof): 실제 값 */
+/** 5.4 미션 상세의 인증 항목 */
 data class MissionProofItem(
     val proofId: Long,
     val user: UserBrief,

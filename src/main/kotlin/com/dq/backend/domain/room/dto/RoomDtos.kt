@@ -66,7 +66,7 @@ data class RoomSummaryResponse(
     val thumbnailUrl: String?,
     val isHot: Boolean,
     val joined: Boolean,
-    // 4.2 내 룸 목록에서만 채워짐. TODO(feat/mission, feat/proof): 실제 집계로 교체
+    // 4.2 내 룸 목록에서만 채워짐
     val todayMissionDone: Boolean? = null,
     val pendingProofCount: Long? = null,
 )
@@ -101,16 +101,16 @@ data class RoomMemberResponse(
     val nickname: String,
     val role: RoomRole,
     val avatar: AvatarDto,
-    val todayMissionDone: Boolean, // TODO(feat/proof): 실제 집계
+    val todayMissionDone: Boolean,
     val joinedAt: Instant,
 ) {
     companion object {
-        fun from(member: RoomMember, user: User) = RoomMemberResponse(
+        fun from(member: RoomMember, user: User, todayMissionDone: Boolean) = RoomMemberResponse(
             userId = user.id,
             nickname = user.nickname,
             role = member.role,
             avatar = AvatarDto.from(user.avatar),
-            todayMissionDone = false,
+            todayMissionDone = todayMissionDone,
             joinedAt = member.joinedAt,
         )
     }

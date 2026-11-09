@@ -646,7 +646,7 @@ Authorization: Bearer {accessToken}
 }
 ```
 
-에러: `FILE_TOO_LARGE` (400), `UNSUPPORTED_MEDIA_TYPE` (400)
+에러: `FILE_TOO_LARGE` (400), `UNSUPPORTED_MEDIA_TYPE` (400), `FILE_EMPTY` (400)
 
 > 구현 메모: 초기에는 서버 로컬 디스크에 저장하고 `/files/**`로 서빙합니다. 배포 시 Firebase Storage 또는 S3로 교체할 수 있도록 `StorageService` 인터페이스로 분리합니다.
 
